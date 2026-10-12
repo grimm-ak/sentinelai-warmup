@@ -56,59 +56,66 @@
   </main>
 
   <script>
-    const API = "https://sentinelai-api-dbuv.onrender.com";
-    const DASHBOARD = "https://sentinel-ai-silk-seven.vercel.app/";
-    let attempts = 0;
-    let cancelled = false;
+  const API = "https://sentinelai-api-dbuv.onrender.com";
+  const DASHBOARD = "https://sentinel-ai-silk-seven.vercel.app/";
 
-    async function startCheck() {
-      cancelled = false;
-      attempts = 0;
-      document.getElementById("actions").style.display = "none";
-      checkBackend();
+  let attempts = 0;
+  let checking = false;
+  let retryTimer;
+
+  async function startCheck() {
+    if (checking) return;
+
+    checking = true;
+    attempts = 0;
+    clearTimeout(retryTimer);
+    document.getElementById("actions").style.display = "none";
+    await checkBackend();
+  }
+
+  async function checkBackend() {
+    attempts++;
+
+    const status = document.getElementById("status");
+    const detail = document.getElementById("detail");
+
+    status.textContent = `Connecting to backend… (attempt ${attempts})`;
+    detail.textContent =
+      "The free-tier backend may need time to wake up.";
+
+    try {
+      const response = await fetch(`${API}/health`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(25000)
+      });
+
+      if (response.ok) {
+        status.textContent = "Backend connected. Opening dashboard…";
+        detail.textContent = "Redirecting to SentinelAI.";
+
+        setTimeout(() => {
+          window.location.replace(DASHBOARD);
+        }, 800);
+        return;
+      }
+    } catch (error) {
+      // Retry if the backend is still waking up.
     }
 
-    async function checkBackend() {
-      if (cancelled) return;
-      attempts++;
-
-      document.getElementById("status").textContent =
-        `Waking up backend… (attempt ${attempts})`;
-
-      try {
-        const response = await fetch(API + "/health", {
-          cache: "no-store",
-          signal: AbortSignal.timeout(15000)
-        });
-
-        if (response.ok) {
-          document.getElementById("status").textContent =
-            "Backend is responding. Opening dashboard…";
-          document.getElementById("detail").textContent =
-            "Redirecting you to SentinelAI.";
-          setTimeout(() => {
-            window.location.href = DASHBOARD;
-          }, 800);
-          return;
-        }
-      } catch (error) {
-        // The backend may still be waking up.
-      }
-
-      if (attempts < 12 && !cancelled) {
-        document.getElementById("detail").textContent =
-          "Please wait while the service starts. This can take a minute or more.";
-        setTimeout(checkBackend, 5000);
-      } else {
-        document.getElementById("status").textContent =
-          "The service hasn't responded yet.";
-        document.getElementById("detail").textContent =
-          "You can retry or open the dashboard directly.";
-        document.getElementById("actions").style.display = "block";
-      }
+    if (attempts < 12) {
+      detail.textContent =
+        "Still waiting for the service. Please keep this page open.";
+      retryTimer = setTimeout(checkBackend, 3000);
+    } else {
+      checking = false;
+      status.textContent = "Could not connect yet.";
+      detail.textContent =
+        "The service may still be starting. Retry or open the dashboard directly.";
+      document.getElementById("actions").style.display = "block";
     }
+  }
 
-    startCheck();
-  </script>
+  startCheck();
+</script>
 </body>
 </html>
