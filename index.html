@@ -49,73 +49,74 @@
     <p>Machine-learning-powered network intrusion detection.</p>
     <div class="status" id="status">Connecting to detection service…</div>
     <p id="detail">The backend may take a little longer to start after inactivity.</p>
-    <div id="actions">
-      <button onclick="startCheck()">Retry connection</button>
-      <p><a class="secondary" href="https://sentinel-ai-silk-seven.vercel.app/">Open dashboard anyway</a></p>
-    </div>
+    <<div id="actions">
+  <p>Automatic connection didn't work. You can open either service manually:</p>
+  <p>
+    <a href="https://sentinelai-api-dbuv.onrender.com/health" target="_blank" rel="noopener noreferrer">
+      Open Backend Health Check
+    </a>
+  </p>
+  <p>
+    <a href="https://sentinel-ai-silk-seven.vercel.app/" target="_blank" rel="noopener noreferrer">
+      Open SentinelAI Dashboard
+    </a>
+  </p>
+</div>
   </main>
 
   <script>
-  const API = "https://sentinelai-api-dbuv.onrender.com";
-  const DASHBOARD = "https://sentinel-ai-silk-seven.vercel.app/";
+    const API = "https://sentinelai-api-dbuv.onrender.com";
+    const DASHBOARD = "https://sentinel-ai-silk-seven.vercel.app/";
+    let attempts = 0;
+    let cancelled = false;
 
-  let attempts = 0;
-  let checking = false;
-  let retryTimer;
+    async function startCheck() {
+      cancelled = false;
+      attempts = 0;
+      document.getElementById("actions").style.display = "none";
+      checkBackend();
+    }
 
-  async function startCheck() {
-    if (checking) return;
+    async function checkBackend() {
+      if (cancelled) return;
+      attempts++;
 
-    checking = true;
-    attempts = 0;
-    clearTimeout(retryTimer);
-    document.getElementById("actions").style.display = "none";
-    await checkBackend();
-  }
+      document.getElementById("status").textContent =
+        `Waking up backend… (attempt ${attempts})`;
 
-  async function checkBackend() {
-    attempts++;
+      try {
+        const response = await fetch(API + "/health", {
+          cache: "no-store",
+          signal: AbortSignal.timeout(15000)
+        });
 
-    const status = document.getElementById("status");
-    const detail = document.getElementById("detail");
-
-    status.textContent = `Connecting to backend… (attempt ${attempts})`;
-    detail.textContent =
-      "The free-tier backend may need time to wake up.";
-
-    try {
-      const response = await fetch(`${API}/health`, {
-        cache: "no-store",
-        signal: AbortSignal.timeout(25000)
-      });
-
-      if (response.ok) {
-        status.textContent = "Backend connected. Opening dashboard…";
-        detail.textContent = "Redirecting to SentinelAI.";
-
-        setTimeout(() => {
-          window.location.replace(DASHBOARD);
-        }, 800);
-        return;
+        if (response.ok) {
+          document.getElementById("status").textContent =
+            "Backend is responding. Opening dashboard…";
+          document.getElementById("detail").textContent =
+            "Redirecting you to SentinelAI.";
+          setTimeout(() => {
+            window.location.href = DASHBOARD;
+          }, 800);
+          return;
+        }
+      } catch (error) {
+        // The backend may still be waking up.
       }
-    } catch (error) {
-      // Retry if the backend is still waking up.
-    }
 
-    if (attempts < 12) {
-      detail.textContent =
-        "Still waiting for the service. Please keep this page open.";
-      retryTimer = setTimeout(checkBackend, 3000);
-    } else {
-      checking = false;
-      status.textContent = "Could not connect yet.";
-      detail.textContent =
-        "The service may still be starting. Retry or open the dashboard directly.";
-      document.getElementById("actions").style.display = "block";
-    }
-  }
+     if (attempts < 12) {
+  detail.textContent =
+    "Still waiting for the service. Please keep this page open.";
+  retryTimer = setTimeout(checkBackend, 3000);
+} else {
+  checking = false;
+  status.textContent = "Automatic connection failed";
+  detail.textContent =
+    "Choose either link below to continue manually.";
+  document.getElementById("actions").style.display = "block";
+}
 
-  startCheck();
-</script>
+    startCheck();
+  </script>
 </body>
 </html>
